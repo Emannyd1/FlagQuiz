@@ -1,13 +1,20 @@
 package edu.miracosta.cs134.flagquiz;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
 
 import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.res.AssetManager;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -28,7 +35,10 @@ import edu.miracosta.cs134.flagquiz.model.JSONLoader;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "Flag Quiz";
-
+    public static final String REGIONS = "pref_regions";
+    public static final String CHOICES = "pref_numberOfChoices";
+    private int mChoices = 4;
+    private String mRegion = "All";
     private static final int FLAGS_IN_QUIZ = 10;
 
     private Button[] mButtons = new Button[4];
@@ -71,7 +81,8 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             Log.e(TAG, "Error loading from JSON", e);
         }
-
+        PreferenceManager.getDefaultSharedPreferences(this)
+                .registerOnSharedPreferenceChangeListener(mSharedPreferenceChangeListener);
         // DONE: Call the method resetQuiz() to start the quiz.
         resetQuiz();
     }
@@ -93,7 +104,7 @@ public class MainActivity extends AppCompatActivity {
         while (mQuizCountriesList.size() < FLAGS_IN_QUIZ)
         {
             random = mAllCountriesList.get(rng.nextInt(mAllCountriesList.size()));
-            if (!mQuizCountriesList.contains(random))
+            if (!mQuizCountriesList.contains(random) && (random.getRegion().equals(mRegion) || mRegion.equals("All")))
                 mQuizCountriesList.add(random);
         }
         // DONE: Ensure no duplicate countries (e.g. don't add a country if it's already in mQuizCountriesList)
@@ -182,7 +193,19 @@ public class MainActivity extends AppCompatActivity {
             {
                 AlertDialog.Builder builder = new AlertDialog.Builder(this);
                 builder.setMessage(getString(R.string.results, mTotalGuesses,
-                        (double)mCorrectGuesses/mTotalGuesses));
+                        100*((double)mCorrectGuesses/mTotalGuesses)));
+
+                //set positive button of the dialog
+                // reset quiz
+                builder.setPositiveButton(getString(R.string.reset_quiz), new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialogInterface, int i) {
+                        resetQuiz();
+                    }
+                });
+                builder.setCancelable(false);
+                builder.create();
+                builder.show();
             }
         }else
         {
@@ -200,4 +223,55 @@ public class MainActivity extends AppCompatActivity {
 
 
     }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_settings, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        Intent settingsIntent = new Intent(this, SettingsActivity.class);
+        startActivity(settingsIntent);
+        return super.onOptionsItemSelected(item);
+    }
+
+    SharedPreferences.OnSharedPreferenceChangeListener
+            mSharedPreferenceChangeListener =
+            new SharedPreferences.OnSharedPreferenceChangeListener() {
+                @Override
+                public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
+                                                      String key) {
+                    if (key.equals(REGIONS))
+                    {
+                        String region = sharedPreferences.getString(REGIONS,
+                                getString(R.string.default_region));
+                        updateRegion(region);
+                        resetQuiz();
+                    }
+                    else if (key.equals(CHOICES))
+                    {
+                        mChoices = Integer.parseInt(sharedPreferences.getString(CHOICES,
+                                getString(R.string.default_choices)));
+                        updateChoices();
+                        resetQuiz();
+                    }
+                    Toast.makeText(MainActivity.this, R.string.restarting_quiz,
+                            Toast.LENGTH_SHORT).show();
+                }
+            };
+    public void updateRegion(String region)
+    {
+        region.replaceAll("_", " ");
+        mRegion = region;
+
+    }
+
+
+    public void updateChoices()
+    {
+    }
+
+
 }
